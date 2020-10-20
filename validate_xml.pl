@@ -27,8 +27,14 @@ XML elements must have a closing tag yes
 XML tags are case sensitive yes
 XML elements must be properly nested yes
 XML attribute values must be quoted
+
+detect <tagname=5> ->>>> should be error?
+
+https://en.wikipedia.org/wiki/Well-formed_document
+
+readme up here:
+what the rules are
 =cut
-print "Validate XML\n";
 open(my $in, "<", "sample.xml");
 my %xml_doc = ();
 my @tags = ();
@@ -41,27 +47,56 @@ while (<$in>){
         $element =~ m/([^\/\s]+)/;
         my $tag = $1;
         if($element =~ m/^\//){
-            if(pop(@tags) ne $tag){
-                die("Error found: Tag mismatch on line " . $line_num . ", col " . $element_col . ".\n");
+            if(@tags == 0 || pop(@tags) ne $tag){
+                die_tag_mismatch($line_num, $element_col);
             }            
-            print "closing tag: " . $tag . " found\n";
         } else {
             if($root_found && @tags == 0){
-                die("Error found: Extraneous tag found on line " . $line_num . ", col " . $element_col .
-                 ". XML files must have a single root element.\n")
+                die_extra_tag($line_num, $element_col);
             } else {
                 $root_found = 1;
             }
-            print "pushing " . $tag . " pushed\n";            
+            if($tag =~ m/[!"#$%&'()*+,\/;<=>\?@\[\]^`{|}~]/){
+                my $character_col = $-[0];
+                die_illegal_character($line_num, $element_col + $character_col);
+            } elsif ($tag =~ m/^[0-9-]/){
+                my $character_col = $-[0];
+                die_illegal_character($line_num, $element_col + $character_col);                
+            }
             push(@tags, $tag);
-            print "opening tag: " . $tag . " found\n";
         }
+
     }
     $line_num += 1;
 }
 if(@tags > 0){
-    die("Error found: Missing closing tag for \"" . $tags[$#tags] . "\".\n");
+    die_missing_tag($tags[$#tags]);
 }
-print("No errors found.");
+success_msg();
 close($in);
+
+sub die_illegal_character {
+    my $line_num = $_[0];
+    my $col_num = $_[1];
+    die("This is a malformed XML file.\nError found: Illegal character in tag name on line " . $line_num . ", col " . $col_num . ".\n");
+}
+
+sub die_tag_mismatch {
+    my $line_num = $_[0];
+    my $col_num = $_[1];
+    die("This is a malformed XML file.\nError found: Tag mismatch on line " . $line_num . ", col " . $col_num . ".\n");
+}
+sub die_extra_tag {
+    my $line_num = $_[0];
+    my $col_num = $_[1];
+    die("This is a malformed XML file.\nError found: Extraneous tag found on line " . $line_num . ", col " . $col_num . 
+        ". XML files must have a single root element.\n")    
+}
+sub die_missing_tag {
+    my $missing_tag = $_[0];
+    die("This is a malformed XML file.\nError found: Missing closing tag for \"" . $missing_tag . "\".\n");    
+}
+sub success_msg {
+    print "This is a well-formed XML file.\nNo errors found.\n";
+}
 

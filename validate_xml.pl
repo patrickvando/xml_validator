@@ -1,102 +1,136 @@
 use strict;
 use warnings;
-=pod
-make an xml sample validator using perl
-!!!! :)))))
-
-use stacks
-
-deal with whether or not an xml file is well-formed?
-https://www.informit.com/articles/article.aspx?p=27865&seqNum=11
-single versus double quotations?
-https://www.w3schools.com/xml/xml_syntax.asp
-xml comments
-
-stack to hold open/closing tags
-avoid reading entire document into memory?
-buffer system?
-skip the buffer because that's too much complexity to deal with right now?
-what about <> nested inside quotations?
-https://stackoverflow.com/questions/29398950/is-there-a-way-to-include-greater-than-or-less-than-signs-in-an-xml-file
-read lines into the buffer until we have a tag match?
-throw lines away if we are not inside a tag already?
-forget about these issues until we know more?
-bring up errors
-XML documents must have a root element yes
-XML elements must have a closing tag yes
-XML tags are case sensitive yes
-XML elements must be properly nested yes
-XML attribute values must be quoted
-
-detect <tagname=5> ->>>> should be error?
-
-https://en.wikipedia.org/wiki/Well-formed_document
-
-readme up here:
-what the rules are
-=cut
-open(my $in, "<", "sample.xml");
-my %xml_doc = ();
+$_ = "The year 1752 lost 10 days on the 3rd of September";
+#list all the things this program checks for in readme
+# may not work????? line numbers??/
+# dont read lines, read characters
+# while (/(\d+)/gc) {
+#     print "Found number $1\n";
+# }
+#https://www.informit.com/articles/article.aspx?p=27865&seqNum=11
+# https://xmlwriter.net/xml_guide/xml_declaration.shtml
+# An element may have only one attribute of a given name.
+# if (/\G(\S+)/g) {
+#     print "Found $1 after the last number.\n";
+# }
+my $read_size = 2;
+my $text_buffer = "";
 my @tags = ();
 my $line_num = 1;
 my $root_found = 0;
-while (<$in>){
-    while($_ =~ m/<([^>]*)>/g){
-        my $element_col = $-[0];
-        my $element = $1;
-        $element =~ m/([^\/\s]+)/;
-        my $tag = $1;
-        if($element =~ m/^\//){
-            if(@tags == 0 || pop(@tags) ne $tag){
-                die_tag_mismatch($line_num, $element_col);
-            }            
-        } else {
-            if($root_found && @tags == 0){
-                die_extra_tag($line_num, $element_col);
-            } else {
-                $root_found = 1;
-            }
-            if($tag =~ m/[!"#$%&'()*+,\/;<=>\?@\[\]^`{|}~]/){
-                my $character_col = $-[0];
-                die_illegal_character($line_num, $element_col + $character_col);
-            } elsif ($tag =~ m/^[0-9-]/){
-                my $character_col = $-[0];
-                die_illegal_character($line_num, $element_col + $character_col);                
-            }
-            push(@tags, $tag);
-        }
-
-    }
-    $line_num += 1;
+#dont forget to parse header
+#This takes advantage of the special variable $. which keeps track of the line number in the current file. (See perlvar)
+open(my $in, "<", "sample.xml");
+read($in, $text_buffer, $read_size);
+my $header = read_header();
+validate_header();
+while (1){
+    my $element = read_element();
+    validate_element($element);
+    my $content = read_content();
+    validate_content($content);
 }
-if(@tags > 0){
-    die_missing_tag($tags[$#tags]);
-}
-success_msg();
 close($in);
 
-sub die_illegal_character {
-    my $line_num = $_[0];
-    my $col_num = $_[1];
-    die("This is a malformed XML file.\nError found: Illegal character in tag name on line " . $line_num . ", col " . $col_num . ".\n");
+sub read_element {
+    #Read everything between a '<' and the first '>' that that follows it.
+    my $element = "";
+    if ($text_buffer !~ /^\s*</gc){
+        die "Expected XML tag on line $.\n";
+    }
+    #read until we reach the '>' that corresponds to the end of the element
+    while ($text_buffer =~ /\G([^>]*)$/gc){
+        if (eof($in)){
+            die "Incomplete XML tag. See line $.\n";            
+        }
+        $element .= $1;
+        read($in, $text_buffer, $read_size);
+    }
+    $text_buffer =~ /\G([^>]*)>(.*)/gc;
+    $element .= $1;
+    $text_buffer = $2;
+    return $element;
 }
 
-sub die_tag_mismatch {
-    my $line_num = $_[0];
-    my $col_num = $_[1];
-    die("This is a malformed XML file.\nError found: Tag mismatch on line " . $line_num . ", col " . $col_num . ".\n");
-}
-sub die_extra_tag {
-    my $line_num = $_[0];
-    my $col_num = $_[1];
-    die("This is a malformed XML file.\nError found: Extraneous tag found on line " . $line_num . ", col " . $col_num . 
-        ". XML files must have a single root element.\n")    
-}
-sub die_missing_tag {
-    my $missing_tag = $_[0];
-    die("This is a malformed XML file.\nError found: Missing closing tag for \"" . $missing_tag . "\".\n");    
-}
-sub success_msg {
-    print "This is a well-formed XML file.\nNo errors found.\n";
+sub read_content {
+    my $content = "";
+    #read until we reach the '<' that corresponds to the start of a new element
+    while ($text_buffer =~ /^([^<]*)$/){
+        $content .= $1;
+        if (eof($in)){
+            if ($content =~ /[\S]+/){
+                die "Hanging content. See line $.\n";                            
+            }
+            print "Success.\n";
+            exit 1;
+        }
+        read($in, $text_buffer, $read_size);
+    }
+    $text_buffer =~ /([^<]*)(.*)/;
+    $content .= $1;
+    check_escaped($content);
+    $text_buffer = $2;
+    return $content;
 }
 
+sub validate_element {
+    my $element = shift;
+    my $open_tag = ($element =~ /^\//gc);    
+    my $tag;
+    if ($element !~ /\G(\S+)/gc){
+        die "Invalid tag.\n";
+    } else {
+        $tag = $1;
+        check_illegal_characters($tag);
+    }
+    my %found_attrs = ();
+    while ($element =~ /([^=\s]+)\s*=\s*(\S+)\s*/gc){
+        my $attr = $1;
+        my $val = $2;
+        check_illegal_characters($attr);
+        check_illegal_val($val);
+        print "found attr-value: $1=$2\n";
+        if (exists $found_attrs{$attr}){
+            die "Duplicate attribute value.\n";
+        }
+        $found_attrs{$attr} = 1;
+    }
+    if ($element !~ /\G\s*$/){
+        die "Invalid tag.\n";
+    }
+    print "element is $element\n";
+
+}
+
+sub validate_content {
+    # print "Content: $_[0]\n";
+}
+
+sub read_header {
+    return "";
+}
+
+sub validate_header {
+
+}
+
+sub check_illegal_characters {
+    my $st = shift;
+    if($st =~ m/[!"#$%'()*+,\/;<=>\?@\[\]^`{|}~]/ || $st =~ m/^[0-9-]/){
+        die "Illegal characters found in $st\n";
+    }
+}
+sub check_escaped {
+    my $st = shift;
+    if($st !~ m/^([^&]|&#60;|&lt;|&#62;|&gt;|&#38;|&#39;|&#34;)*$/){
+        die "Bad escaped character found\n";
+    }
+}
+
+sub check_illegal_val {
+    my $st = shift;
+    if($st !~ m/^"[^"]*"$/ or $st =~ m/^'[^']*'$/g){
+        die "Bad attribute value, see $st\n";
+    }
+    check_escaped($st);
+}

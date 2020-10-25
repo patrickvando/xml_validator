@@ -1,19 +1,25 @@
 use strict;
 use warnings;
 
-my $read_size = 1000;
+my ($filename) = @ARGV;
+if (not defined $filename){
+    die "Please supply a filename.\n";
+}
+
+my $special_chars = quotemeta(q(!"#$%'()*+,/;<=>?@[]^`{|}~\\));
+# Maximum number of characters read into the text buffer at once
+my $read_size = 50;
 my $text_buffer = "";
+# Flag for determining whether a single root element has been found
 my $root_found = 0;
+# Array used as stack for determining whether XML elements are properly nested and non-overlapping
 my @tags = ();
-my $line_num = 1;
-#dont forget to parse header
-open(my $in, "<", "sample.xml");
+
+open(my $in, "<", $filename);
 read($in, $text_buffer, $read_size);
-# print "1 $text_buffer\n";
 while (1){
     my $element = read_element();
     print "Element: $element\n";
-    # print "2 $text_buffer\n";
     validate_element($element);
     my $content = read_content();
     print "Content: $content\n";
@@ -24,25 +30,24 @@ close($in);
 sub read_element {
     # Read a single XML element into memory - everything from a '<' to the first subsequent '>'.
     my $element = "";
-    if ($text_buffer !~ /^\s*</gc){
-        die "Expected XML tag on line $.\n";
+    # Throw away comments
+    $text_buffer =~ /^(\s*<!--.*?-->)*/sgc;
+    if ($text_buffer =~ /\G\s*<!--/) {
+        die "Bad comment\n";
+    }
+    if ($text_buffer !~ /\s*</gc){
+        die "Expected XML tag on line\n";
     }
     while ($text_buffer =~ /\G([^>]*)$/gc){
-        # print("READ READ READ\n");
         if (eof($in)){
             die "Incomplete XML tag. See line $.\n";            
         }
         $element .= $1;
         read($in, $text_buffer, $read_size);
     }
-    # print("before, text buffer is $text_buffer x\n");
-    # print("before, element is $element x\n");
     $text_buffer =~ /\G([^>]*)>(.*)$/sgc;
     $element .= $1;
     $text_buffer = $2;
-    # print("capture group 1: $1\ncapture group 2: $2\n");
-    # print("After, text buffer is $text_buffer x\n");
-    # print("found element\n$element\n$text_buffer\nthere\n");
     return $element;
 }
 
@@ -56,6 +61,8 @@ sub read_content {
                 die "Hanging content.\n";                            
             } elsif (@tags > 0){
                 die "Hanging XML tags.\n";
+            } elsif ($root_found == 0){
+                die "Missing root element.\n";
             }
             print "Success.\n";
             exit 1;
@@ -65,28 +72,27 @@ sub read_content {
     $text_buffer =~ /([^<]*)(.*)/s;
     $content .= $1;
     $text_buffer = $2;
-    # print "in buffer $text_buffer\n";
     return $content;
 }
 
 sub validate_element {
     # Check if an element has a legal tag name, legal attribute names, and properly structured attribute=value pairs.
-    # Additionally, check that the tag is properly nested in the greater structure of the XMl document. 
+    # Additionally, check that the tag is properly nested in the greater structure of the XML document. 
     my $element = shift;
-    # print "element is $element\n";        
     if ($root_found == 0 && $element =~ /^\?/) {
         validate_header($element);
         return;
     }
     my $open_tag = ($element !~ /^\//gc);    
     my $tag;
+    # Check if the XML tag has bad spacing (< tag>, </ tag>, < /tag> are all illegal)
     if ($element !~ /\G(\S+)/gc){
         die "Invalid tag.\n";
     } else {
         $tag = $1;
         check_illegal_characters($tag);
     }
-    # print "see here @tags\n";
+    # Check that the XML elements are non-overlapping and that the document contains a single root element
     if ($open_tag){
         if (@tags == 0 && $root_found == 1){
             die "XML documents may contain only a single root element.\n";
@@ -96,12 +102,14 @@ sub validate_element {
     } elsif (@tags == 0 || pop @tags ne $tag){
         die "Bad tag nesting\n";
     }
+    # Check if attribute-value pairs are appropriately structured
+    # Check for duplicate attributes
     my %found_attrs = ();
-    while ($element =~ /([^=\s]+)\s*=\s*(\S+)\s*/gc){
+    while ($element =~ /([^=\s]+)\s*=\s*(('[^']*')|("[^"]*"))\s*/gc){
         my $attr = $1;
         my $val = $2;
         check_illegal_characters($attr);
-        check_illegal_val($val);
+        check_escaped($val);
         print "found attr-value: $1=$2\n";
         if (exists $found_attrs{$attr}){
             die "Duplicate attribute value.\n";
@@ -114,42 +122,30 @@ sub validate_element {
 }
 
 sub validate_header {
+    # XML Headers must take the form <?xml version="xxxx" encoding="xxxx"?>
     my $header = shift;
-    # print "header is $header\n";    
-    if($header =~ /^\?xml\s*version\s*=\s*(\S+)\s*encoding\s*=\s*(\S+)\s*\?$/){
-        check_illegal_val($1);
-        check_illegal_val($2);
-    } else {
+    if($header !~ /^\?xml\s*version\s*=\s*(('[^']*')|("[^"]*"))\s*encoding\s*=\s*(('[^']*')|("[^"]*"))\s*\?$/){
         die "Bad XML header\n.";        
     }
 }
 
 sub validate_content {
+    # Content within XML elements that does not consist of XML tags is allowed as long as it does not contain invalid '&'s.
     my $content = shift;
-    # print "Content is $content\n";
     check_escaped($content);
 }
 
 sub check_illegal_characters {
-    # Check if the given string contains an illegal character. Tag and attribute names are not allowed to contain certain characters.
+    # Check if the tag and attribute names begin with '-', a digit, or contain any of !"#$%'()*+,/;<=>?@[]^`{|}~.
     my $st = shift;
-    if($st =~ m/[!"#$%'()*+,\/;<=>\?@\[\]^`{|}~]/ || $st =~ m/^[0-9-]/){
+    if($st =~ m/[$special_chars]/ || $st =~ m/^[0-9-]/){
         die "Illegal characters found in $st\n";
     }
 }
 sub check_escaped {
-    # Check if the escaped characters are legal special characters.
+    # Check if '&' is being used to represent a character entity of the form '&name;'.
     my $st = shift;
-    if($st !~ m/^([^&]|&#60;|&lt;|&#62;|&gt;|&#38;|&#39;|&#34;)*$/){
+    if($st !~ m/^([^&]|(&[^&$special_chars]*;))*$/){
         die "Bad escaped character found\n";
     }
-}
-
-sub check_illegal_val {
-    #Check if the value in an attribute=value pair is a properly quoted string.
-    my $st = shift;
-    if($st !~ /^"[^"]*"$/ and $st !~ /^'[^']*'$/g){
-        die "Bad attribute value, see $st\n";
-    }
-    check_escaped($st);
 }

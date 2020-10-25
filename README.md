@@ -1,10 +1,10 @@
-
 # xml_validator
-An XML Validator written in Perl.
 
+## Usage 
 This program can be run using the following command: `./validate_xml.pl doc_name.xml`
 
-This program checks if an XML document is well-formed, according the following criteria:
+## About
+This is a Perl program checks if an XML document is well-formed, according the following criteria:
 
 1. An optional XML header is included at the beginning of document
     - An XML header must take the form `<?xml version="xxxx" encoding="xxxx"?>`

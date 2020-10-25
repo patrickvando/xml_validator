@@ -1,2 +1,31 @@
+
 # xml_validator
-An XML validator written in Perl
+An XML Validator written in Perl.
+
+This program checks if an XML document is well-formed, according the following criteria:
+
+1. An optional XML header is included at the top of document
+    - An XML header must take the form `<?xml version="xxxx" encoding="xxxx"?>`
+2. All XML elements are appropriately nested and non-overlapping
+    - Every opening `<tag>` has a corresponding closing `</tag>`
+    - `<first><second></second></first>` is allowed
+    - `<first><second></first></second>` is not allowed
+3. All XML tags have appropriate spacing
+    - All tags have appropriate spacing (`<tag >` and `</tag >` are allowed, but `< tag>`, `< /tag>`, and `</ tag>` are not allowed)
+4. Opening tags may be followed by `attribute = value` pairs, where `value` is single or double quoted, and attribute names are unique
+        - `<tag attr1 = "Hello 'world'" attr2= 'Goodbye "world"'>` is allowed
+        - `<tag attr1 = "Hello 'world'" attr1 = "Goodbye "world"'>` is not allowed
+        - `<tag attr1>` is not allowed
+5. All tags and attributes are appropriately named
+    - Tag and attribute names may not begin with a digit or a `-`
+    - Tag and attribute names may not contain a space
+    - Tag and attribute names may not contain any of the following special characters:``!"#$%&'()*+,/;<=>?@[\]`{|}~``
+6. The special character `&` is not used, except as part of a character entity reference
+    - A character entity reference takes the form `&name;`, where any `name` without special characters is considered valid
+    - For example, `&quot;`, `&lt;` and `&amp;`are character entity references for `"`, `<`, and `&`
+7. All XML elements are contained within a single root element
+    - `<?xml version='1.0' encoding="UTF-8"?><my_root></my_root>` is allowed
+    - `<?xml version='1.0' encoding="UTF-8"?><my_first_root></my_first_root><my_second_root></my_second_root>` is not allowed
+
+## How to run:
+

@@ -17,22 +17,14 @@ my @tags = ();
 my $line_num = 1;
 
 open(my $in, "<", $filename);
-read($in, $text_buffer, $read_size);
+read_into_buf();
 while (1){
     my $element = read_element();
-    print "Element: $element\n";
     validate_element($element);
     my $content = read_content();
-    print "Content: $content\n";
     validate_content($content);
 }
 close($in);
-
-# sub read_into_buf {
-#     my ($input, $buf, $r_size) = @_;
-#     print "$input $buf $r_size)";
-#     read($input, $buf, $r_size);
-# }
 
 sub read_element {
     # Read a single XML element into memory - everything from a '<' to the first subsequent '>'.
@@ -40,17 +32,17 @@ sub read_element {
     # Throw away comments
     $text_buffer =~ /^(\s*<!--.*?-->)*/sgc;
     if ($text_buffer =~ /\G\s*<!--/) {
-        die "Bad comment\n";
+        die "Bad comment. See line $..\n";
     }
     if ($text_buffer !~ /\s*</gc){
-        die "Expected XML tag on line\n";
+        die "Expected XML tag. See line $..\n";
     }
     while ($text_buffer =~ /\G([^>]*)$/gc){
         if (eof($in)){
-            die "Incomplete XML tag. See line $.\n";            
+            die "Incomplete XML tag. See line $..\n";            
         }
         $element .= $1;
-        read($in, $text_buffer, $read_size);
+        read_into_buf();
     }
     $text_buffer =~ /\G([^>]*)>(.*)$/sgc;
     $element .= $1;
@@ -65,16 +57,16 @@ sub read_content {
         $content .= $1;
         if (eof($in)){
             if ($content =~ /[\S]+/){
-                die "Hanging content.\n";                            
+                die "Hanging content. See line $..\n";                            
             } elsif (@tags > 0){
-                die "Hanging XML tags.\n";
+                die "Hanging XML tags. See line $..\n";
             } elsif ($root_found == 0){
-                die "Missing root element.\n";
+                die "Missing root element. See line $..\n";
             }
-            print "Success.\n";
-            exit 1;
+            print "This is a well-formed XML document.\n";
+            exit 0;
         }
-        read($in, $text_buffer, $read_size);
+        read_into_buf();
     }
     $text_buffer =~ /([^<]*)(.*)/s;
     $content .= $1;
@@ -94,7 +86,7 @@ sub validate_element {
     my $tag;
     # Check if the XML tag has bad spacing (< tag>, </ tag>, < /tag> are all illegal)
     if ($element !~ /\G(\S+)/gc){
-        die "Invalid tag.\n";
+        die "Invalid tag. See line $..\n";
     } else {
         $tag = $1;
         check_illegal_characters($tag);
@@ -102,12 +94,12 @@ sub validate_element {
     # Check that the XML elements are non-overlapping and that the document contains a single root element
     if ($open_tag){
         if (@tags == 0 && $root_found == 1){
-            die "XML documents may contain only a single root element.\n";
+            die "XML documents may contain only a single root element. See line $..\n";
         }
         $root_found = 1;       
         push @tags, $tag;
     } elsif (@tags == 0 || pop @tags ne $tag){
-        die "Bad tag nesting\n";
+        die "Bad tag nesting. See line $..\n";
     }
     # Check if attribute-value pairs are appropriately structured
     # Check for duplicate attributes
@@ -117,22 +109,21 @@ sub validate_element {
         my $val = $2;
         check_illegal_characters($attr);
         check_escaped($val);
-        print "found attr-value: $1=$2\n";
         if (exists $found_attrs{$attr}){
-            die "Duplicate attribute value.\n";
+            die "Duplicate attribute value. See line $..\n";
         }
         $found_attrs{$attr} = 1;
     }
     if ($element !~ /\G\s*$/){
-        die "Invalid tag.\n";
+        die "Invalid tag. See line $..\n";
     }
 }
 
 sub validate_header {
     # XML Headers must take the form <?xml version="xxxx" encoding="xxxx"?>
     my $header = shift;
-    if($header !~ /^\?xml\s*version\s*=\s*(('[^']*')|("[^"]*"))\s*encoding\s*=\s*(('[^']*')|("[^"]*"))\s*\?$/){
-        die "Bad XML header\n.";        
+    if($header !~ /^\?xml\s*version\s*=\s*(('[^']*')|("[^"]*"))\s*(encoding\s*=\s*(('[^']*')|("[^"]*")))?\s*\?$/){
+        die "Bad XML header. See line $..\n.";        
     }
 }
 
@@ -146,13 +137,17 @@ sub check_illegal_characters {
     # Check if the tag and attribute names begin with '-', a digit, or contain any of !"#$%'()*+,/;<=>?@[]^`{|}~.
     my $st = shift;
     if($st =~ m/[$special_chars]/ || $st =~ m/^[0-9-]/){
-        die "Illegal characters found in $st\n";
+        die "Illegal character found. See line $..\n";
     }
 }
 sub check_escaped {
     # Check if '&' is being used to represent a character entity of the form '&name;'.
     my $st = shift;
     if($st !~ m/^([^&]|(&[^&$special_chars]*;))*$/){
-        die "Bad escaped character found\n";
+        die "Bad escaped character found. See line $..\n";
     }
+}
+
+sub read_into_buf {
+    $text_buffer = <$in>;
 }

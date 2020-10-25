@@ -7,7 +7,7 @@ This program can be run using the following command: `./validate_xml.pl doc_name
 This is a Perl program checks if an XML document is well-formed, according the following criteria:
 
 1. An optional XML header is included at the beginning of document
-    - This XML header must take the form `<?xml version="xxxx" encoding="xxxx"?>`
+    - This XML header must take the form `<?xml version="xxxx" encoding="xxxx"?>`, where the `encoding` attribute is optional
 2. All XML elements are appropriately nested and non-overlapping
     - Every opening `<tag>` has a corresponding closing `</tag>`
     - `<first><second></second></first>` is allowed

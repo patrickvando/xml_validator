@@ -15,9 +15,9 @@ This is a Perl program checks if an XML document is well-formed, according the f
 3. All XML tags have appropriate spacing
     - All tags have appropriate spacing (`<tag >` and `</tag >` are allowed, but `< tag>`, `< /tag>`, and `</ tag>` are not allowed)
 4. Opening tags may be followed by `attribute = value` pairs, where `value` is single or double quoted, and attribute names are unique
-        - `<tag attr1 = "Hello 'world'" attr2= 'Goodbye "world"'>` is allowed
-        - `<tag attr1 = "Hello 'world'" attr1 = "Goodbye "world"'>` is not allowed
-        - `<tag attr1>` is not allowed
+    - `<tag attr1 = "Hello 'world'" attr2= 'Goodbye "world"'>` is allowed
+    - `<tag attr1 = "Hello 'world'" attr1 = "Goodbye "world"'>` is not allowed
+    - `<tag attr1>` is not allowed
 5. All tags and attributes are appropriately named
     - Tag and attribute names may not begin with a digit or a `-`
     - Tag and attribute names may not contain a space

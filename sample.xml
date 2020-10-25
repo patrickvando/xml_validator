@@ -1,6 +1,46 @@
-<note>
-<to>Tove</to>
-<from>Jani</from>
-<heading>Reminder</heading>
-<body>Don't forget me this weekend!</body>
-</note>
+<?xml version="1.0" encoding="UTF-8" ?>
+<inventory>
+    <item>
+        <name>Apple</name>
+        <description>
+            Our most popular fruit. Commonly eaten alone as a healthy snack, but can also be baked into pies.
+        </description>
+        <status perishable="true" fresh="true"></status>
+    </item>
+    <item>
+        <name>Spinach</name>
+        <description>
+            Our most popular vegetable. Commonly eaten as part of a cold salad, but can also be sauteed.
+        </description>
+        <status perishable="true" fresh="true"></status>
+    </item>
+    <item>
+        <name>Peanut butter</name>
+        <description>
+            Popular spread for sandwiches.
+        </description>
+        <status perishable="true" fresh="false"></status>
+        <notes>Peanuts are actually a legume.</notes>
+    </item>
+    <item>
+        <name>Raisins</name>
+        <description>
+            Dried grapes. Can be used in salads, oatmeal, and in baked goods. Watch the serving size!
+        </description>
+        <status perishable="true" fresh="false"></status>
+    </item>
+    <item>
+        <name>Canned Tomato</name>
+        <description>
+            A popular ingredient in savory sauces and other dishes.
+        </description>
+        <status perishable="false" fresh="false"></status>
+    </item>
+    <item>
+        <name>Oats</name>
+        <description>
+            A nutritious source of carbs. 
+        </description>
+        <status perishable="false" fresh="false"></status>
+    </item>
+</inventory>

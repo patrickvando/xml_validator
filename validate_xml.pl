@@ -1,3 +1,6 @@
+# Use this program to determine whether or not an XML document is well formed. 
+# See README for the full list of criteria that this program verifies.
+# USAGE: ./validate_xml.pl filename.xml
 use strict;
 use warnings;
 

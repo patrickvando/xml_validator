@@ -14,6 +14,7 @@ my $text_buffer = "";
 my $root_found = 0;
 # Array used as stack for determining whether XML elements are properly nested and non-overlapping
 my @tags = ();
+my $line_num = 1;
 
 open(my $in, "<", $filename);
 read($in, $text_buffer, $read_size);
@@ -26,6 +27,12 @@ while (1){
     validate_content($content);
 }
 close($in);
+
+# sub read_into_buf {
+#     my ($input, $buf, $r_size) = @_;
+#     print "$input $buf $r_size)";
+#     read($input, $buf, $r_size);
+# }
 
 sub read_element {
     # Read a single XML element into memory - everything from a '<' to the first subsequent '>'.
